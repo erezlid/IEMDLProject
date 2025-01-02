@@ -41,7 +41,7 @@ def change_gender_randomly(caption):
             form_index = gender_terms.index(caption_words[i]) % len(gender_terms_map[0])
             caption_words[i] = gender_terms_map[random.randint(0, 1)][form_index]
     new_caption = ' '.join(map(str, caption_words))
-    print(f'Changed caption from {caption} to {new_caption}')
+    # print(f'Changed caption from {caption} to {new_caption}')
     return new_caption
 
 
@@ -120,15 +120,15 @@ def run_main():
         if add_text_embedding:
             out_path = f"./data/coco/verified_split_COCO_train_set_with_text_not_norm.pkl"
             print(f'Text embeddings will be added to the dataset')
-        annotations_path = f'/home/gamir/DER-Roei/davidn/myprivate_coco/annotations/train.json'
-        images_path = '/home/gamir/DER-Roei/davidn/myprivate_coco/train2014/'
+        annotations_path = f'/sise/home/erezlid/CapDec/post_processed_karpthy_coco/train.json'
+        images_path = '/sise/home/erezlid/CapDec/data/images_coco/train2014'
     elif args.dataset_mode == 0.5:
         out_path = f"./data/coco/COCO_val_set_single_cap_per_sample.pkl"
         if add_text_embedding:
             out_path = f"./data/coco/COCO_val_set_single_cap_per_sample_with_text_not_norm.pkl"
             print(f'Text embeddings will be added to the dataset')
-        annotations_path = f'/home/gamir/DER-Roei/davidn/myprivate_coco/annotations/single_caption_per_sample_val.json'
-        images_path = '/home/gamir/DER-Roei/davidn/myprivate_coco/val2014/'
+        annotations_path = f'/sise/home/erezlid/CapDec/post_processed_karpthy_coco/val.json'
+        images_path = '/sise/home/erezlid/CapDec/data/images_coco/val2014/'
     elif args.dataset_mode == 1:
         out_path = f"./data/flicker30_{clip_model_name}_train.pkl"
         if add_text_embedding:
