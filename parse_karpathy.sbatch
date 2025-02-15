@@ -29,5 +29,5 @@ module load anaconda				### load anaconda module (must be present when working w
 source activate CapDec				### activate a conda environment, replace my_env with your conda environment
 #jupyter lab					### this command executes jupyter lab – replace with your own command
 #python my_code.py my_arg1
-python parse_karpathy.py
+python tune_noise.py
 

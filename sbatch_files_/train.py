@@ -29,53 +29,11 @@ def get_t_distribution_noise(x, df):
     noise = t_dist.sample(x.shape).to(device)
     return noise
 
-def get_noise_by_sim(x, samples=100, min_sim=0.7, beta=0.1):
-    """
-       Generate noisy samples, filter based on cosine similarity, and compute weighted differences.
-
-       Args:
-           x (torch.Tensor): Input tensor of shape (batch_size, vector_dim).
-           samples (int): Number of noisy samples to generate per vector.
-           min_sim (float): Minimum cosine similarity threshold to keep samples.
-           beta (float): Scale factor for the noise.
-
-       Returns:
-           torch.Tensor: Weighted difference sums of shape (batch_size, vector_dim).
-       """
-    batch_size, vector_dim = x.shape
-
-    # Step 1: Generate noisy samples
-    x_squeezed = x.unsqueeze(1)  # Shape: (batch_size, 1, vector_dim)
-    x_expanded = x_squeezed.expand(-1, samples, -1)  # Shape: (batch_size, samples, vector_dim)
-    noise = beta * torch.randn_like(x_expanded)  # Shape: (batch_size, samples, vector_dim)
-    noisy_samples = x_expanded + noise  # Shape: (batch_size, samples, vector_dim)
-
-    # Step 2: Compute cosine similarities
-    x_normalized = nnf.normalize(x, dim=1)  # Shape: (batch_size, vector_dim)
-    noisy_samples_normalized = nnf.normalize(noisy_samples, dim=2)  # Shape: (batch_size, samples, vector_dim)
-    cosine_sim = torch.einsum("bd,bsd->bs", x_normalized, noisy_samples_normalized)  # Shape: (batch_size, samples)
-
-    # Step 3: Filter samples based on similarity threshold
-    mask = cosine_sim >= min_sim  # Shape: (batch_size, samples)
-    filtered_sim = torch.where(mask, cosine_sim, torch.zeros_like(cosine_sim))  # Zero out invalid similarities
-    valid_samples = mask.sum(dim=1)  # Number of valid samples per batch
-
-    # Step 4: Calculate weights (normalized cosine similarities)
-    sum_sim = filtered_sim.sum(dim=1, keepdim=True)  # Shape: (batch_size, 1)
-    weights = torch.where(sum_sim > 0, filtered_sim / sum_sim,
-                          torch.zeros_like(filtered_sim))  # Shape: (batch_size, samples)
-
-    # Step 5: Compute weighted differences
-    diffs = noisy_samples - x_squeezed  # Shape: (batch_size, samples, vector_dim)
-    weighted_diffs = weights.unsqueeze(2) * diffs  # Shape: (batch_size, samples, vector_dim)
-    weighted_sum = weighted_diffs.sum(dim=1)  # Shape: (batch_size, vector_dim)
-
-    return nnf.normalize(weighted_sum, dim=1)
 
 
 def noise_injection(x, variance=0.001, modality_offset=None,
                     uniform_noise=False, dont_norm=False, gaussian_norm_inverse=False, t_noise=False,df=3.0,
-                    grad_noise=False, noise_step_size = 0.01,grad=None,noise_by_sim = False,samples=100,min_sim=0.7,beta=0.1):
+                    grad_noise=False, noise_step_size = 0.01,grad=None):
     if variance == 0.0:
         return x
     std = math.sqrt(variance)
@@ -94,8 +52,6 @@ def noise_injection(x, variance=0.001, modality_offset=None,
         x = x + noise
     elif grad_noise and grad is not None:
         x = x + grad*noise_step_size/torch.norm(grad)
-    elif noise_by_sim:
-        x = x + get_noise_by_sim(x,samples,min_sim,beta)
     else:
         x = x + (torch.randn(x.shape, device=device) * std)  # todo by some conventions multivraiance noise should be devided by sqrt of dim
     if modality_offset is not None:
@@ -410,7 +366,7 @@ def train(dataset: ClipCocoDataset, model: ClipCaptionModel, args, warmup_steps:
         for idx, (tokens, mask, prefix) in enumerate(train_dataloader):
             model.zero_grad()
             tokens, mask, prefix = tokens.to(device), mask.to(device), prefix.to(device, dtype=torch.float32)
-            if not args.grad_noise and not args.proxyLoss and not args.noise_by_sim:
+            if not args.grad_noise and not args.proxyLoss:
                 prefix = noise_injection(prefix, args.noise_variance,
                                          modality_offset=modality_offset,
                                          uniform_noise=args.uniform_noise,
@@ -429,12 +385,6 @@ def train(dataset: ClipCocoDataset, model: ClipCaptionModel, args, warmup_steps:
                                          grad_noise = args.grad_noise,
                                          noise_step_size = args.noise_step_size,
                                          grad = grad)
-            elif args.noise_by_sim:
-                prefix = noise_injection(prefix,
-                                         noise_by_sim=args.noise_by_sim,
-                                         samples = args.samples,
-                                         min_sim = args.min_sim,
-                                         beta = args.beta)
 
             outputs = model(tokens, prefix, mask)
             logits = outputs.logits[:, dataset.prefix_length - 1: -1]
@@ -515,10 +465,6 @@ def main():
     parser.add_argument('--proxyLoss',dest='proxyLoss',action='store_true', default=False,
                         help='add proxy loss rather adding noise to text embeddings')
     parser.add_argument('--alpha',type=float, default=0.1, help='Alpha parameter for proxy loss')
-    parser.add_argument('--noise_by_sim',dest='noise_by_sim',action='store_true', default=False,help='Choose the direction based on cosine similarity')
-    parser.add_argument('--min_sim',type=float,default=0.7,help='control the consine similarity threshold')
-    parser.add_argument('--samples',type=int,default=100, help='control the number of candidates in the noise by similarity method')
-    parser.add_argument('--beta', type=float, default=0.1, help='control the variance of the gaussian noise in noise by similarity method')
     parser.add_argument('--dont_norm', dest='dont_norm', action='store_true', default=False, help='dont normalize CLIP embeddings')
     parser.add_argument('--lr', type=float, default=2e-5, help='learning rate')
     parser.add_argument('--epochs', type=int, default=10, help='number of epochs')
@@ -533,7 +479,6 @@ def main():
     parser.add_argument('--is_not_rn', dest='is_not_rn', action='store_true', default=False, help='Choose the CLIP backbone: False for RN, True for ViT')
     parser.add_argument('--use_image_embedding_as_clipcap', dest='use_image_embedding_as_clipcap', action='store_true', default=False, help='use image embedding as ClipCap')
     args = parser.parse_args()
-
     if args.data == 'COCO':
         args.bs = 30
         if args.use_image_embedding_as_clipcap:
@@ -574,8 +519,6 @@ def main():
                                  mapping_type=args.mapping_type)
         print("Train both prefix and GPT")
         sys.stdout.flush()
-
-
     if args.pretrain_weights != '':
         model.load_state_dict(torch.load(args.pretrain_weights, map_location=device))
     print(f'modality_offset={args.add_modality_offset}')
@@ -586,12 +529,6 @@ def main():
         args_at_dict.pop('mapping_type')
         json.dump(dict(args_at_dict), f, indent=2)
         print(f'args saved to file {args.out_dir}/train_commandline_args.txt')
-
-    if args.noise_by_sim:
-        print(f'Noise by similarity: {args.noise_by_sim}\n'
-              f'Samples:{args.samples}\n'
-              f'Beta:{args.beta}\n'
-              f'Similarity Threshold:{args.min_sim}\n')
     train(dataset, model, args, output_dir=args.out_dir, output_prefix=args.prefix)
 
 
