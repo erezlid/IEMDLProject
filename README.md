@@ -34,7 +34,7 @@ During inference, the model:
 
 ## Noise Injection Techniques  
 We experimented with different noise injection strategies:  
-- **Gaussian Noise:** Random perturbations to embeddings.  
+- **Gaussian Noise:** Cosine similarity directed gaussian noise.
 - **T-Distribution Noise:** Alternative statistical noise distribution.  
 - **Normalized Gradient Noise:** Adjusts noise dynamically based on gradient updates.  
 
