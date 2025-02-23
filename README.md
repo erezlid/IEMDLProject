@@ -50,12 +50,6 @@ We evaluated the model using **cosine similarity** between generated captions an
 - Comparing them against **three to five real captions** per image.  
 - Computing an average similarity score across all real captions.  
 
-## Key Findings  
-- **Pre-trained CapDec performed best overall.**  
-- **Gradient noise injection improved performance** more effectively than other noise types.  
-- **Transformer depth had mixed effects**, with no clear trend.  
-- **Cosine similarity-directed noise was ineffective**, but further tuning might improve results.  
-
 ## References  
 Nukrai, D., Mokady, R., & Globerson, A. (2022). Text-only training for image captioning using noise-injected CLIP. *arXiv preprint arXiv:2211.00575*.  
 [CapDec GitHub Repository](https://github.com/DavidHuji/CapDec)  
